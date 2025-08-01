@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Airport Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <style>
+        html, body, #map {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .leaflet-top.leaflet-left {
+            top: 50px !important;
+        }
+
+        #airportSearch {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            width: 300px;
+            padding: 5px;
+        }
+
+        .aircraft-icon-rotated img {
+            transition: transform 0.3s ease;
+            transform-origin: center center;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="airportSearch" placeholder="Havalimani ara (ICAO, isim, Sehir)...">
+    <div id="map"></div>
+    <div id="distanceInfo" style="position:absolute;top:60px;left:10px;z-index:1100;background:white;padding:6px 12px;border-radius:6px;box-shadow:0 2px 6px #0002;display:none;font-weight:bold;"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script>
+        // Tile layers
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        });
+        var dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            attribution: '© CartoDB'
+        });
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18,
+            attribution: '© Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+        var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: '© OpenTopoMap contributors'
+        });
+
+        // Base layers
+        var baseLayers = {
+            "OpenStreetMap": osm,
+            "Dark": dark,
+            "Satellite": satellite,
+            "Topo": topo
+        };
+
+        // Varsayılan olarak sadece OSM açık
+        var map = L.map('map', {
+            center: [30, 0],
+            zoom: 2,
+            layers: [osm]
+        });
+
+        L.control.layers(baseLayers, null, { position: 'topright', collapsed: false }).addTo(map);
+
+        var markers = L.markerClusterGroup();
+        map.addLayer(markers);
+
+        var allAirports = [];
+        var allMarkers = [];
+        var selectedMarkers = [];
+        var routeLine = null;
+
+        // C#'tan veri gelince bu fonksiyon çağrılacak
+        window.addAirports = function (airports) {
+            console.log("addAirports �a�r�ld�", airports);
+            markers.clearLayers();
+            allAirports = airports;
+            allMarkers = [];
+            airports.forEach(function (ap) {
+                if (ap.datum_lat && ap.datum_lon) {
+                    var lat = parseFloat(ap.datum_lat);
+                    var lon = parseFloat(ap.datum_lon);
+                    var airportIcon = L.icon({
+                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -16]
+                    });
+                    var marker = L.marker([lat, lon], { icon: airportIcon });
+                    marker.bindPopup('<b>' + ap.ICAO + '</b><br>' + ap.Name +
+                        (ap.City ? '<br>' + ap.City : '') +
+                        (ap.Country ? '<br>' + ap.Country : ''));
+                    marker.airportData = ap;
+                    allMarkers.push(marker);
+                    markers.addLayer(marker);
+                }
+            });
+        };
+
+        // Sadece seçili havalimanlarını ve rotayı göster
+        window.showSelectedAirportsAndRoute = function (payload) {
+            // payload: { airports: [ { ICAO, Name, datum_lat, datum_lon, ... } ] }
+            // Temizle
+            if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+            selectedMarkers.forEach(function (m) { map.removeLayer(m); });
+            selectedMarkers = [];
+            document.getElementById('distanceInfo').style.display = 'none';
+
+            var airports = payload.airports || [];
+            if (airports.length === 0) return;
+
+            var markerIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -18]
+            });
+            var latlngs = [];
+            airports.forEach(function (ap) {
+                if (ap.datum_lat && ap.datum_lon) {
+                    var lat = parseFloat(ap.datum_lat);
+                    var lon = parseFloat(ap.datum_lon);
+                    var marker = L.marker([lat, lon], { icon: markerIcon });
+                    marker.bindPopup('<b>' + ap.ICAO + '</b><br>' + ap.Name +
+                        (ap.City ? '<br>' + ap.City : '') +
+                        (ap.Country ? '<br>' + ap.Country : ''));
+                    marker.addTo(map);
+                    selectedMarkers.push(marker);
+                    latlngs.push([lat, lon]);
+                }
+            });
+            if (latlngs.length === 1) {
+                map.setView(latlngs[0], 7);
+            } else if (latlngs.length === 2) {
+                // Rota çiz
+                routeLine = L.polyline(latlngs, { color: 'blue', weight: 2, opacity: 0.9, dashArray: '8 8' }).addTo(map);
+                map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                // Mesafe hesapla
+                var d = haversine(latlngs[0], latlngs[1]);
+                var info = document.getElementById('distanceInfo');
+                info.innerText = 'Kuş uçuşu mesafe: ' + d.toFixed(1) + ' km';
+                info.style.display = 'block';
+            }
+
+            // Son havalimanı arrival ise, canlı takip için lat/lon'u kaydet
+            var airports = payload.airports || [];
+            if (airports.length === 2) {
+                var arr = airports[1];
+                if (arr.datum_lat && arr.datum_lon) {
+                    window.lastArrivalLatLon = [parseFloat(arr.datum_lat), parseFloat(arr.datum_lon)];
+                } else {
+                    window.lastArrivalLatLon = null;
+                }
+            } else {
+                window.lastArrivalLatLon = null;
+            }
+        };
+
+        // Haversine formülü (km)
+        function haversine(a, b) {
+            var toRad = function (x) { return x * Math.PI / 180; };
+            var lat1 = a[0], lon1 = a[1], lat2 = b[0], lon2 = b[1];
+            var R = 6371;
+            var dLat = toRad(lat2 - lat1);
+            var dLon = toRad(lon2 - lon1);
+            var sLat1 = toRad(lat1);
+            var sLat2 = toRad(lat2);
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(sLat1) * Math.cos(sLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Arama kutusu event
+        document.getElementById('airportSearch').addEventListener('input', function (e) {
+            var query = e.target.value.toLowerCase();
+            markers.clearLayers();
+            allMarkers.forEach(function (marker) {
+                var ap = marker.airportData;
+                if (
+                    (ap.ICAO && ap.ICAO.toLowerCase().includes(query)) ||
+                    (ap.Name && ap.Name.toLowerCase().includes(query)) ||
+                    (ap.City && ap.City.toLowerCase().includes(query)) ||
+                    (ap.Country && ap.Country.toLowerCase().includes(query))
+                ) {
+                    markers.addLayer(marker);
+                }
+            });
+        });
+
+        window.updateAircraftPosition = function (lat, lon, heading) {
+            // Heading değeri yoksa 0 olarak kabul et
+            heading = heading || 0;
+
+            // Uçak marker'ını oluştur veya güncelle
+            if (!window.aircraftMarkerIcon) {
+                window.aircraftMarkerIcon = L.icon({
+                    iconUrl: 'https://icons.iconarchive.com/icons/icons8/windows-8/48/Transport-Airplane-Mode-On-icon.png', // Uçak simgesi
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16],
+                    popupAnchor: [0, -16]
+                });
+            }
+
+            if (!window.aircraftMarker) {
+                window.aircraftMarker = L.marker([lat, lon], { icon: window.aircraftMarkerIcon, zIndexOffset: 1000 }).addTo(map);
+                window.aircraftMarker.bindPopup('Uçak Konumu');
+            } else {
+                window.aircraftMarker.setLatLng([lat, lon]);
+            }
+
+            // CSS ile döndürme uygula
+            var iconElement = window.aircraftMarker.getElement();
+            if (iconElement) {
+                var imgElement = iconElement.querySelector('img');
+                if (imgElement) {
+                    imgElement.style.transform = 'rotate(' + heading + 'deg)';
+                }
+            }
+
+            // Eğer varış havalimanı seçiliyse, mesafeyi ve rotayı güncelle
+            if (window.lastArrivalLatLon) {
+                var arr = window.lastArrivalLatLon;
+                // Kırmızı kesikli rota
+                if (window.aircraftToArrivalLine) {
+                    map.removeLayer(window.aircraftToArrivalLine);
+                }
+                window.aircraftToArrivalLine = L.polyline([[lat, lon], arr], { color: 'red', weight: 2, opacity: 0.9, dashArray: '6 8' }).addTo(map);
+                // Mesafe
+                var d = haversine([lat, lon], arr);
+                var info = document.getElementById('distanceInfo');
+                info.innerText = 'Uçak -> Varış mesafe: ' + d.toFixed(1) + ' km';
+                info.style.display = 'block';
+            }
+        };
+
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('ready');
+        }
+    </script>
+</body>
+</html>

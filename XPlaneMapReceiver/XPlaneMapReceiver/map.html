@@ -39,6 +39,7 @@
     <div id="distanceInfo" style="position:absolute;top:60px;left:10px;z-index:1100;background:white;padding:6px 12px;border-radius:6px;box-shadow:0 2px 6px #0002;display:none;font-weight:bold;"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet-rotatedmarker/leaflet.rotatedMarker.js"></script>
     <script>
         // Tile layers
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -214,20 +215,20 @@
                 });
             }
 
+            // Uçak simgesi varsayılan olarak doğuya (90°) bakar; heading'e göre döndürmek için 90° çıkarılır.
+            // Döndürme leaflet-rotatedmarker ile yapılır (Leaflet marker'ın kendi transform'unu bozmadan)
+            var rotation = heading - 90;
             if (!window.aircraftMarker) {
-                window.aircraftMarker = L.marker([lat, lon], { icon: window.aircraftMarkerIcon, zIndexOffset: 1000 }).addTo(map);
+                window.aircraftMarker = L.marker([lat, lon], {
+                    icon: window.aircraftMarkerIcon,
+                    zIndexOffset: 1000,
+                    rotationAngle: rotation,
+                    rotationOrigin: 'center center'
+                }).addTo(map);
                 window.aircraftMarker.bindPopup('Uçak Konumu');
             } else {
                 window.aircraftMarker.setLatLng([lat, lon]);
-            }
-
-            // CSS ile döndürme uygula
-            var iconElement = window.aircraftMarker.getElement();
-            if (iconElement) {
-                var imgElement = iconElement.querySelector('img');
-                if (imgElement) {
-                    imgElement.style.transform = 'rotate(' + heading + 'deg)';
-                }
+                window.aircraftMarker.setRotationAngle(rotation);
             }
 
             // Eğer varış havalimanı seçiliyse, mesafeyi ve rotayı güncelle

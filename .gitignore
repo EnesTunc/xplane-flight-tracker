@@ -1,0 +1,23 @@
+# Build output
+x64/
+Debug/
+Release/
+bin/
+obj/
+.vs/
+*.user
+packages/
+
+# Machine-specific paths (see xplane.local.props.example)
+xplane.local.props
+
+# Generated from X-Plane's apt.dat with tools/build_airports.py
+XPlaneMapReceiver/XPlaneMapReceiver/Data/
+
+# Local-only folders
+VeriCursor/
+yedekler/
+MyXPlanePlugin/
+.claude/
+XPlaneMapReceiver/XPlaneMapReceiver.csproj
+XPlaneMapReceiver/XPlaneMapReceiver/Leaflet.RotatedMarker-master/

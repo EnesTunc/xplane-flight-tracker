@@ -1,0 +1,9 @@
+<Project>
+  <!-- Copy this file to xplane.local.props and adjust the paths for your machine. -->
+  <PropertyGroup>
+    <!-- X-Plane installation; the built plugin is copied to Resources\plugins\MapPlugin\64\win.xpl -->
+    <XPlaneDir>C:\X-Plane 12</XPlaneDir>
+    <!-- X-Plane SDK (https://developer.x-plane.com/sdk/) -->
+    <XPSDK>C:\XPSDK411\SDK</XPSDK>
+  </PropertyGroup>
+</Project>

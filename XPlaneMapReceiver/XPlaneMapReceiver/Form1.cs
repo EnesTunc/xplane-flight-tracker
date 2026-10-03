@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using XPlaneMapReceiver.Models;
 using XPlaneMapReceiver.Services;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using System.IO;
 using System.Text.Json;
@@ -15,7 +16,17 @@ namespace XPlaneMapReceiver
     public partial class Form1 : Form
     {
         private List<Airport> airports;
-        private string csvPath = @"D:\SteamLibrary\steamapps\common\X-Plane 11\Resources\default scenery\default apt dat\Earth nav data\airports.csv";
+        // Havalimanı verisi uygulamanın yanındaki Data klasöründen okunur (tools/build_airports.py ile üretilir)
+        private static readonly string dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
+        private string csvPath = Path.Combine(dataDir, "airports.csv");
+        private const string MapHost = "xplanemap.local";
+
+        // XPlaneMapPlugin'in UDP mesajındaki alan sırası (XPlaneMapPlugin.cpp, udpMsg)
+        private const int PluginFieldCount = 32;
+        private const int HeadingIndex = 23;
+        private const int AirspeedIndex = 29;
+        private const int AglIndex = 31;
+        private DateTime lastDataLogTime = DateTime.MinValue;
 
         // Services
         private MapService mapService;
@@ -56,18 +67,19 @@ namespace XPlaneMapReceiver
             webView.Dock = DockStyle.Fill;
             this.Controls.Add(webView);
 
-            // map.html dosyasını yükle
-            string htmlPath = @"C:\Users\enest\OneDrive\Masaüstü\XPlaneMapReceiver\XPlaneMapReceiver\map.html";
-            webView.Source = new Uri(htmlPath);
+            // JSON dosyasını oku (yoksa harita havalimanları olmadan açılır)
+            string jsonPath = Path.Combine(dataDir, "airports.json");
+            string json = File.Exists(jsonPath) ? File.ReadAllText(jsonPath) : "[]";
 
-            // JSON dosyasını oku
-            string jsonPath = @"D:\SteamLibrary\steamapps\common\X-Plane 11\Resources\default scenery\default apt dat\Earth nav data\airports.json";
-            string json = File.ReadAllText(jsonPath);
-
-            // WebView2 yüklendikten sonra JS'ye markerları gönder
+            // WebView2 yüklendikten sonra haritayı aç ve JS'ye markerları gönder
             webView.CoreWebView2InitializationCompleted += (s, e) =>
             {
-                // Artık CoreWebView2 hazır!
+                // map.html file:// yerine sanal bir https adresinden açılır; OpenStreetMap
+                // döşeme isteklerinde geçerli bir Referer bekliyor, file:// ile 403 dönüyor
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    MapHost, AppDomain.CurrentDomain.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
+                webView.CoreWebView2.Navigate($"https://{MapHost}/map.html");
+
                 webView.CoreWebView2.WebMessageReceived += (s2, e2) =>
                 {
                     if (e2.TryGetWebMessageAsString() == "ready")
@@ -77,6 +89,7 @@ namespace XPlaneMapReceiver
                     }
                 };
             };
+            _ = webView.EnsureCoreWebView2Async();
 
             // Initialize services
             mapService = new MapService();
@@ -453,11 +466,10 @@ namespace XPlaneMapReceiver
             {
                 Invoke(new Action(() =>
                 {
-                    textBox1.AppendText(message + Environment.NewLine);
-
-                    // Mesajı parse et: lat,lon,elev,tailnum,onground,heading
+                    // Mesajı parse et: eklenti 32 alan gönderir (lat,lon,elev,tailnum,onground,...,heading[23],...,airspeed[29],model[30],agl[31]).
+                    // 49001 portuna X-Plane'in kendi UDP paketleri (DREF vb.) de düşebilir; bu biçime uymayanlar yok sayılır.
                     var parts = message.Split(',');
-                    if (parts.Length >= 2 &&
+                    if (parts.Length >= PluginFieldCount &&
                         double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double lat) &&
                         double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double lon))
                     {
@@ -478,13 +490,18 @@ namespace XPlaneMapReceiver
                             // if (int.TryParse(parts[4], out ongroundInt))
                             //     onground = (ongroundInt == 1);
                         }
-                        double heading = 0;
-                        if (parts.Length > 5)
-                            double.TryParse(parts[5], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out heading);
-                        
-                        // Debug: Heading değerini göster
-                        //textBox1.AppendText($"Heading: {heading}° (Raw: {parts.Length > 5 ? parts[5] : "N/A"})\n");
-                        
+                        double.TryParse(parts[HeadingIndex], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double heading);
+                        double.TryParse(parts[AirspeedIndex], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double airspeed);
+                        double.TryParse(parts[AglIndex], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double agl);
+
+                        // Veri kutusuna saniyede bir okunabilir özet yaz (eklenti saniyede 10 mesaj gönderir)
+                        if ((DateTime.Now - lastDataLogTime).TotalSeconds >= 1)
+                        {
+                            lastDataLogTime = DateTime.Now;
+                            string state = onground ? "yerde" : FormattableString.Invariant($"AGL {agl:F0} m");
+                            AppendLog(FormattableString.Invariant($"{tailnum}  {lat:F4}, {lon:F4}  HDG {heading:F0}°  {airspeed:F0} kt  {state}"));
+                        }
+
                         lastTailNum = tailnum;
                         // JS'ye gönder
                         if (webView.CoreWebView2 != null)
@@ -523,6 +540,14 @@ namespace XPlaneMapReceiver
             };
 
             await udpService.StartListening(49001);
+        }
+
+        // Veri kutusunu sınırlı tutarak satır ekler (uzun uçuşlarda metin sınırsız büyümesin)
+        private void AppendLog(string line)
+        {
+            if (textBox1.TextLength > 20000)
+                textBox1.Text = textBox1.Text.Substring(textBox1.TextLength - 10000);
+            textBox1.AppendText(line + Environment.NewLine);
         }
 
         // Event Handlers

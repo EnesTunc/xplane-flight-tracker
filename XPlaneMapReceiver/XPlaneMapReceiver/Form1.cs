@@ -77,6 +77,21 @@ namespace XPlaneMapReceiver
                     MapHost, AppDomain.CurrentDomain.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
                 webView.CoreWebView2.Navigate($"https://{MapHost}/map.html");
 
+                // Harita dışındaki bağlantılar (ör. attribution) varsayılan tarayıcıda açılır, harita kaybolmaz
+                webView.CoreWebView2.NavigationStarting += (s3, e3) =>
+                {
+                    if (!e3.Uri.StartsWith($"https://{MapHost}/"))
+                    {
+                        e3.Cancel = true;
+                        System.Diagnostics.Process.Start(e3.Uri);
+                    }
+                };
+                webView.CoreWebView2.NewWindowRequested += (s3, e3) =>
+                {
+                    e3.Handled = true;
+                    System.Diagnostics.Process.Start(e3.Uri);
+                };
+
                 webView.CoreWebView2.WebMessageReceived += (s2, e2) =>
                 {
                     if (e2.TryGetWebMessageAsString() == "ready")

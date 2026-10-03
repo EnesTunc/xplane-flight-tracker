@@ -59,7 +59,7 @@ Personal hobby project, built in 2025 on X-Plane 11 and updated for X-Plane 12. 
 
 - [Dear ImGui](https://github.com/ocornut/imgui) 1.90.1 (MIT), included in `MyXPlanePlugin/` with its license.
 - [Leaflet](https://leafletjs.com/), [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) and [leaflet-rotatedmarker](https://github.com/bbecquet/Leaflet.RotatedMarker), loaded from unpkg.
-- Map tiles from OpenStreetMap, OpenTopoMap and Esri.
+- Map tiles are loaded at runtime from [OpenStreetMap](https://www.openstreetmap.org/copyright) (under the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)), [CARTO](https://carto.com/attributions), [OpenTopoMap](https://opentopomap.org) and Esri World Imagery; each layer shows its attribution on the map. Map data © OpenStreetMap contributors. Satellite imagery in the screenshots © Esri and its data providers.
 - The X-Plane SDK and the airport data (derived from X-Plane's `apt.dat`) are not included in this repository.
 
 ## License

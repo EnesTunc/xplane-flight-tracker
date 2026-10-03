@@ -17,7 +17,7 @@ XPlaneMapReceiver/XPlaneMapReceiver/Data/
 # Local-only folders
 VeriCursor/
 yedekler/
-MyXPlanePlugin/
+MyXPlanePlugin/imgui/
 .claude/
 XPlaneMapReceiver/XPlaneMapReceiver.csproj
 XPlaneMapReceiver/XPlaneMapReceiver/Leaflet.RotatedMarker-master/

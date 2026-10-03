@@ -21,3 +21,4 @@ MyXPlanePlugin/imgui/
 .claude/
 XPlaneMapReceiver/XPlaneMapReceiver.csproj
 XPlaneMapReceiver/XPlaneMapReceiver/Leaflet.RotatedMarker-master/
+MyXPlanePlugin/MyXPlanePlugin/imgui_demo.cpp

@@ -101,7 +101,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\AirportService.cs" />
     <Compile Include="Services\FlightRecorder.cs" />
-    <Compile Include="Services\MapService.cs" />
     <Compile Include="Services\UdpService.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>

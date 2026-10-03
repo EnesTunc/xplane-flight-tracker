@@ -29,12 +29,9 @@ namespace XPlaneMapReceiver
         private DateTime lastDataLogTime = DateTime.MinValue;
 
         // Services
-        private MapService mapService;
         private UdpService udpService;
 
         // UI State
-        private bool isDragging = false;
-        private Point lastMousePos;
         private Timer redrawTimer;
 
         private WebView2 webView;
@@ -92,7 +89,6 @@ namespace XPlaneMapReceiver
             _ = webView.EnsureCoreWebView2Async();
 
             // Initialize services
-            mapService = new MapService();
             udpService = new UdpService();
 
             // Setup UI events

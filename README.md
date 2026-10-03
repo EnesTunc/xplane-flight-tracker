@@ -2,7 +2,12 @@
 
 Live flight tracking for X-Plane. A C++ plugin running inside the simulator streams aircraft data over UDP to a Windows desktop app, which shows the aircraft on a map, records the flight and replays it.
 
-<!-- Screenshots: docs/images/ -->
+![X-Plane cockpit next to the tracker: live data and the route to the arrival airport](docs/images/route-live.jpg)
+
+<p>
+  <img src="docs/images/satellite-eddf.jpg" width="49%" alt="Aircraft on the runway at Frankfurt, satellite layer">
+  <img src="docs/images/airports-overview.jpg" width="49%" alt="Airport clusters across Europe">
+</p>
 
 ## Features
 
@@ -12,6 +17,10 @@ Live flight tracking for X-Plane. A C++ plugin running inside the simulator stre
 - **Route.** Pick departure and arrival airports to draw the route and show the remaining distance.
 - **Flight recording and replay.** Save a flight as CSV or JSON and replay it with pause, speed control, forward and rewind.
 - **Voice callouts** using Windows speech synthesis (for example after lift-off).
+
+### DataRef Monitor
+
+A separate in-sim tool (`MyXPlanePlugin/`) built with Dear ImGui. It watches datarefs while you operate the cockpit, lists the ones that change, and exports the captured list to a text file. Useful for finding which dataref a switch or button drives when an aircraft's documentation is limited.
 
 ## Architecture
 
@@ -26,6 +35,7 @@ Each UDP packet is one line of 32 comma-separated fields; the field order is def
 |---|---|
 | `XPlaneMapPlugin/` | X-Plane plugin (C++, Visual Studio) |
 | `XPlaneMapReceiver/` | Desktop map app (C#, .NET Framework 4.8) |
+| `MyXPlanePlugin/` | DataRef Monitor plugin (C++, Dear ImGui) |
 | `tools/` | Airport data generator |
 
 ## Getting started
@@ -33,7 +43,7 @@ Each UDP packet is one line of 32 comma-separated fields; the field order is def
 Requirements: Windows, X-Plane 11 or 12, Visual Studio 2022 (C++ and .NET desktop workloads), the [X-Plane SDK](https://developer.x-plane.com/sdk/), Python 3, and the WebView2 Runtime (included with Windows 11).
 
 1. **Configure paths.** Copy `xplane.local.props.example` to `xplane.local.props` and set your X-Plane folder and SDK path.
-2. **Build the plugin.** Open `XPlaneMapPlugin/XPlaneMapPlugin.sln` and build `Release | x64`. The plugin is copied to `X-Plane/Resources/plugins/MapPlugin/64/win.xpl`.
+2. **Build the plugin.** Open `XPlaneMapPlugin/XPlaneMapPlugin.sln` and build `Release | x64`. The plugin is copied to `X-Plane/Resources/plugins/MapPlugin/64/win.xpl`. The DataRef Monitor in `MyXPlanePlugin/` builds the same way and is copied to `plugins/DataRefMonitor`.
 3. **Generate the airport data** from your X-Plane installation:
    ```bash
    python tools/build_airports.py "<X-Plane 12>/Global Scenery/Global Airports/Earth nav data/apt.dat"
@@ -47,6 +57,7 @@ Personal hobby project, built in 2025 on X-Plane 11 and updated for X-Plane 12. 
 
 ## Third-party
 
+- [Dear ImGui](https://github.com/ocornut/imgui) 1.90.1 (MIT), included in `MyXPlanePlugin/` with its license.
 - [Leaflet](https://leafletjs.com/), [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) and [leaflet-rotatedmarker](https://github.com/bbecquet/Leaflet.RotatedMarker), loaded from unpkg.
 - Map tiles from OpenStreetMap, OpenTopoMap and Esri.
 - The X-Plane SDK and the airport data (derived from X-Plane's `apt.dat`) are not included in this repository.
